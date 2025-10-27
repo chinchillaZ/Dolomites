@@ -1,0 +1,18 @@
+{
+"type": "FeatureCollection",
+"name": "attraction_utf8",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "italian": "Alpe di Siusi", "german": "Seiser Alm", "eng": "Alpe di Siusi Plateau", "zh-tw": "休斯高原" }, "geometry": { "type": "Point", "coordinates": [ 11.6168855, 46.5423435 ] } },
+{ "type": "Feature", "properties": { "italian": "Cinque Torri", "german": "Fünf Türme", "eng": "Five Towers", "zh-tw": "五塔山" }, "geometry": { "type": "Point", "coordinates": [ 12.0515668, 46.5098675 ] } },
+{ "type": "Feature", "properties": { "italian": "Lago di Braies", "german": "Pragser Wildsee", "eng": "Lake Braies", "zh-tw": "布萊耶斯湖" }, "geometry": { "type": "Point", "coordinates": [ 12.0854273, 46.694333 ] } },
+{ "type": "Feature", "properties": { "italian": "Lago di Carezza", "german": "Karersee", "eng": "Lake Carezza", "zh-tw": "卡雷札湖" }, "geometry": { "type": "Point", "coordinates": [ 11.5750645, 46.4092273 ] } },
+{ "type": "Feature", "properties": { "italian": "Lago di Dobbiaco", "german": "Toblacher See", "eng": "Lake Dobbiaco", "zh-tw": "多比亞可湖" }, "geometry": { "type": "Point", "coordinates": [ 12.21917945, 46.7036857 ] } },
+{ "type": "Feature", "properties": { "italian": "Lago di Misurina", "german": "Misurinasee", "eng": "Lake Misurina", "zh-tw": "米蘇里納湖" }, "geometry": { "type": "Point", "coordinates": [ 12.254444, 46.5825777 ] } },
+{ "type": "Feature", "properties": { "italian": "Lago di Sorapis", "german": "Sorapissee", "eng": "Lake Sorapis", "zh-tw": "索拉皮斯湖" }, "geometry": { "type": "Point", "coordinates": [ 12.2235133, 46.5205589 ] } },
+{ "type": "Feature", "properties": { "italian": "Seceda", "german": "Seceda", "eng": "Seceda", "zh-tw": "塞切達山" }, "geometry": { "type": "Point", "coordinates": [ 11.7241678, 46.5980566 ] } },
+{ "type": "Feature", "properties": { "italian": "Tre Cime di Lavaredo", "german": "Drei Zinnen", "eng": "Three Peaks of Lavaredo", "zh-tw": "拉瓦雷多三峰" }, "geometry": { "type": "Point", "coordinates": [ 12.300959, 46.6180383 ] } },
+{ "type": "Feature", "properties": { "italian": "Val Fiscalina", "german": "Fischleintal", "eng": "Fiscalina Valley", "zh-tw": "富內斯山谷" }, "geometry": { "type": "Point", "coordinates": [ 12.351336, 46.6584695 ] } },
+{ "type": "Feature", "properties": { "italian": "Prato Piazza", "german": "Plätzwiese", "eng": "High Plateau", "zh-tw": "普拉托高原" }, "geometry": { "type": "Point", "coordinates": [ 12.19404117, 46.64176868 ] } }
+]
+}
