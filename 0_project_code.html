@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Explore Dolomites</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        #map {
+            height: 700px;
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        @media screen and (min-width: 768px) {
+            .container {
+                padding: 0 40px;
+            }
+        }
+
+        @media screen and (min-width: 1200px) {
+            .container {
+                padding: 0 60px;
+            }
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            line-height: 1.5;
+            font-family: Arial, sans-serif;
+        }
+
+        h2 {
+            color: #CF2C28;
+            font-family: Arial, sans-serif;
+        }
+
+        .leaflet-popup-content {
+            font-family: Arial, sans-serif;
+        }
+
+        .intro {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px 30px;
+            line-height: 1.8;
+            font-size: 17px;
+            color: #333;
+            background-color: #fafafa;
+            border-radius: 12px;
+        }
+
+        .highlight {
+            font-weight: bold;
+            color: #000;
+        }
+
+        .key {
+            font-size: 18px;
+            font-weight: 700;
+        }
+    </style>
+
+    <!-- Leaflet.draw CSS/JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Explore Dolomites ⛰️</h2>
+        <div class="intro">
+            <p>
+                Dreaming of the Dolomites but worried about the <span class="highlight">cost</span> or the <span class="highlight">logistics</span>? 
+                You're in the right place!
+            </p>
+            <p>
+                This site is made for <span class="highlight">budget travelers</span> and <span class="highlight">backpackers</span> who want to explore the stunning Dolomites 
+                <span class="highlight">without renting a car</span>.
+            </p>
+            <p>
+                We focus on the <span class="highlight">East & West Dolomites</span> and show you how to get around using <span class="highlight">buses</span>, <span class="highlight">trains</span>, and <span class="highlight">cable cars</span>, 
+                where to buy tickets, and how to reach the best <span class="highlight">hiking trails</span> and <span class="highlight">viewpoints</span>
+            </p>
+            <p>
+                Whether it's your first visit or you're just looking for the <span class="highlight">most affordable, easy way</span> to explore, 
+                we'll help you plan a trip that's smooth, scenic, and unforgettable
+            </p>
+            <p>
+                Your adventure starts here — smart, affordable, and stress-free ✨
+            </p>
+        </div>
+        <div id="map"></div>
+
+        <!-- Export / controls UI -->
+        <div style="text-align:center; margin:12px 0;">
+            <button id="exportBtn" style="padding:8px 12px; background:#CF2C28; color:#fff; border:0; border-radius:6px; cursor:pointer;">
+                Export drawn GeoJSON
+            </button>
+            <button id="clearDrawnBtn" style="padding:8px 12px; margin-left:8px;">Clear drawn</button>
+        </div>
+    </div>
+    <script>
+        // 初始化地圖（保留原本 setView）
+        var map = L.map('map').setView([46.6, 11.9], 10);
+
+        // 定義兩個底圖，不直接用 addTo 兩個都加；只把預設的 osm 加到地圖上
+        var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+        var topo = L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: '&copy; OpenTopoMap contributors'
+        });
+
+        // 預設底圖
+        osm.addTo(map);
+
+        // 把 baseMaps 暴露給 layer control（addLayerControl 會使用）
+        var baseMaps = {
+            "OpenStreetMap": osm,
+            "OpenTopoMap (terrain)": topo
+        };
+
+        function styleRoutes(feature) {
+            return {
+                color: 'blue',
+                weight: 3,
+                opacity: 0.7,
+                fillOpacity: 0.3
+            };
+        }
+
+        // Modify the styleCommunities function to include zIndex
+        function styleCommunities(feature) {
+            var props = feature && feature.properties ? feature.properties : {};
+            var id = props.PRO_COM !== undefined ? String(props.PRO_COM) : '';
+            var highlightIds = new Set(['21008','21011','21028','21061','21085','21089','21092','25016']);
+
+            if (highlightIds.has(id)) {
+                return {
+                    color: 'grey',
+                    weight: 1.2,
+                    fillColor: 'grey',
+                    fillOpacity: 0.3,
+                    zIndex: 1  // lowest layer
+                };
+            }
+
+            return {
+                color: 'grey',
+                weight: 0.8,
+                fillColor: 'grey',
+                fillOpacity: 0.1,
+                zIndex: 1  // lowest layer
+            };
+        }
+
+        // 點擊顯示 popup
+        function onEachFeature(feature, layer) {
+            if (feature.properties && feature.properties.source_fil) {
+                layer.bindPopup('<strong>' + feature.properties.source_fil + '</strong>');
+            }
+        }
+
+        // Add this new function for highlighting
+        function highlightFeature(e) {
+            var layer = e.target;
+
+            // Store the original style to revert back later
+            if (!layer.originalStyle) {
+                layer.originalStyle = Object.assign({}, layer.options);
+            }
+
+            layer.setStyle({
+                weight: 3,
+                color: '#ff4444',
+                fillOpacity: 0.3,
+                fillColor: '#ff8888'
+            });
+        }
+
+        // Add this function to reset the highlight
+        function resetHighlight(e) {
+            var layer = e.target;
+            if (layer.originalStyle) {
+                layer.setStyle(layer.originalStyle);
+            } else {
+                layer.setStyle(styleCommunities(layer.feature));
+            }
+        }
+
+        // Modify your onEachFeatureCom function
+        function onEachFeatureCom(feature, layer) {
+            if (feature.properties && feature.properties.COMUNE) {
+                let comune = feature.properties.COMUNE;
+                let italianName = '';
+                let germanName = '';
+
+                // Check if comune contains "/"
+                if (comune.includes('/')) {
+                    // Split the string and get both names
+                    let names = comune.split('/');
+                    italianName = names[0].trim();
+                    germanName = names[1].trim();
+                    
+                    // Build popup with both names
+                    let popupContent = `
+                        <strong>Name (Italian):</strong> ${italianName}<br>
+                        <strong>Name (German):</strong> ${germanName}<br>
+                    `;
+                    layer.bindPopup(popupContent);
+                } else {
+                    // If no "/", use the whole string as Italian name
+                    italianName = comune.trim();
+                    
+                    // Build popup with only Italian name
+                    let popupContent = `
+                        <strong>Name (Italian):</strong> ${italianName}<br>
+                    `;
+                    layer.bindPopup(popupContent);
+                }
+
+                // Add click listeners for highlight/reset
+                layer.on({
+                    click: highlightFeature,
+                    popupclose: resetHighlight
+                });
+            }
+        }
+
+
+        // Add this function to handle point features
+        function onEachAttraction(feature, layer) {
+            if (feature.properties) {
+                let popupContent = `
+            <strong>Name (Italian):</strong> ${feature.properties.italian}<br>
+            <strong>Name (German):</strong> ${feature.properties.german}<br>
+            <strong>Name (English):</strong> ${feature.properties.eng}<br>
+            <strong>Name (Chinese):</strong> ${feature.properties['zh-tw']}<br>
+            <img src="https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/P_{idx}.png"
+                alt="{row['English']}" width="300" height="200">
+        `;  
+                layer.bindPopup(popupContent);
+            }
+        }
+
+        // 從 GitHub fetch GeoJSON
+        function loadGeoJSON(url, styleFunc, popupFunc) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    L.geoJson(data, {
+                        style: styleFunc,
+                        onEachFeature: popupFunc
+                    }).addTo(map);
+                })
+                .catch(err => console.error('Error loading GeoJSON:', err));
+        }
+
+        // 建立圖層變數（unchanged）
+        var hikingRoutesLayer;
+        var communitiesLayer;
+        var attractionsLayer;
+        var transportLayer;
+        var attractionCounter = 0;
+        var drawnItems = L.featureGroup().addTo(map); // drawnItems 保留在地圖上
+
+        https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/transport_utf8.geojson
+
+        // Modify your fetch order - fetch and add communities first, then routes, then attractions
+        // First load communities (bottom layer)
+        fetch('https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/Com_dolomites_wgs84.geojson')
+            .then(res => res.json())
+            .then(data => {
+                communitiesLayer = L.geoJson(data, {
+                    style: styleCommunities,
+                    onEachFeature: onEachFeatureCom
+                });
+                communitiesLayer.addTo(map);
+                
+                // Then load routes (middle layer)
+                return fetch('https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/merged_routes.geojson');
+            })
+            .then(res => res.json())
+            .then(data => {
+                hikingRoutesLayer = L.geoJson(data, {
+                    style: styleRoutes,
+                    onEachFeature: onEachFeature
+                });
+                hikingRoutesLayer.addTo(map);
+                
+                // Finally load attractions (top layer)
+                return fetch('https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/attraction_utf8.geojson');
+            })
+            .then(res => res.json())
+            .then(data => {
+                // assign a stable index to each feature so we can map images P_1.png, P_2.png ...
+                if (data && Array.isArray(data.features)) {
+                    data.features.forEach((f, i) => {
+                        f.properties = f.properties || {};
+                        f.properties._idx = i + 1; // 1-based index
+                    });
+                }
+
+                attractionsLayer = L.geoJson(data, {
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: "#CF2C28",
+                            color: "#000",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        // build popup and image URL(s)
+                        var p = feature.properties || {};
+                        var idx = p._idx || (++attractionCounter);
+                        var title = p.eng || p.italian || p.german || "";
+                        // primary image naming convention: P_<index>.png (change if your repo uses different names)
+                        var imgUrl = 'https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/P_' + idx + '.png';
+                        // fallback placeholder if image missing
+                        var placeholder = 'https://via.placeholder.com/300x200?text=No+image';
+
+                        var popupContent = '<div style="max-width:320px;">' +
+                            '<strong>Name (Italian):</strong> ' + (p.italian || '') + '<br>' +
+                            '<strong>Name (German):</strong> ' + (p.german || '') + '<br>' +
+                            '<strong>Name (English):</strong> ' + (p.eng || '') + '<br>' +
+                            '<strong>Name (Chinese):</strong> ' + (p['zh-tw'] || '') + '<br><br>' +
+                            // the onerror will fall back to the placeholder if the image does not exist
+                            '<img src="' + imgUrl + '" alt="' + title.replace(/"/g,'') + '" ' +
+                            'style="width:300px;height:200px;object-fit:cover;" ' +
+                            'onerror="this.onerror=null;this.src=\'' + placeholder + '\';" />' +
+                            '</div>';
+
+                        layer.bindPopup(popupContent);
+                    }
+                });
+                attractionsLayer.addTo(map);
+                addLayerControl();
+            })
+            .catch(err => console.error('Error loading GeoJSON:', err));
+
+        // fetch attractions (已在檔案中) 之後或任意位置加入下列程式以載入 transport (點圖層)
+        fetch('https://raw.githubusercontent.com/chinchillaZ/Dolomites/main/transport_utf8.geojson')
+            .then(res => res.json())
+            .then(data => {
+                // Function to get icon based on type
+                function getTransportIcon(type) {
+                    var iconConfig = {
+                        'A': {
+                            color: '#FF6B6B',  // red for A (airport)
+                            unicode: '✈'
+                        },
+                        'C': {
+                            color: '#4ECDC4',  // teal for C (car/coach)
+                            unicode: '🚌'
+                        },
+                        'T': {
+                            color: '#FFE66D',  // yellow for T (train)
+                            unicode: '🚂'
+                        }
+                    };
+                    return iconConfig[type] || {color: '#888888', unicode: '●'};
+                }
+
+                transportLayer = L.geoJson(data, {
+                    pointToLayer: function(feature, latlng) {
+                        var p = feature.properties || {};
+                        var type = p.type || 'Unknown';
+                        var icon = getTransportIcon(type);
+
+                        // Create custom HTML for marker
+                        var markerHTML = '<div style="background:' + icon.color + ';width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3);">' + icon.unicode + '</div>';
+
+                        var customMarker = L.divIcon({
+                            html: markerHTML,
+                            iconSize: [32, 32],
+                            className: 'transport-marker'
+                        });
+
+                        return L.marker(latlng, {icon: customMarker});
+                    },
+                    onEachFeature: function(feature, layer) {
+                        var p = feature.properties || {};
+                        var type = p.type || 'Unknown';
+                        var name = p.name || 'No name';
+
+                        // Type labels
+                        var typeLabel = {
+                            'A': 'Airport',
+                            'C': 'Coach/Bus',
+                            'T': 'Train'
+                        };
+
+                        var popupContent = '<div style="max-width:250px;font-size:14px;">' +
+                            '<strong>' + name + '</strong><br>' +
+                           // '<em>Type: ' + (typeLabel[type] || type) + '</em>' +
+                            '</div>';
+
+                        layer.bindPopup(popupContent);
+                    }
+                }).addTo(map);
+
+                // 確保圖層控制器更新
+                addLayerControl();
+            })
+            .catch(err => console.error('Error loading transport GeoJSON:', err));
+
+        // 圖層控制：只有在 overlays 都載入後才加入，並把 baseMaps 傳入
+        function addLayerControl() {
+            if (hikingRoutesLayer && communitiesLayer && attractionsLayer && !window._layerControl && transportLayer) {
+                var overlays = {
+                    "Hiking Routes": hikingRoutesLayer,
+                    "Attraction": attractionsLayer,
+                    "Communities": communitiesLayer,
+                    "Transportation": transportLayer
+                };
+                window._layerControl = L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+            }
+        }
+
+        // keep references so we don't add multiple controls
+        var scaleControl = null;
+        var legendControl = null;
+
+        // Add a scale bar to the map (add only once)
+        if (!scaleControl) {
+            scaleControl = L.control.scale({
+                position: 'bottomleft',
+                metric: true,
+                imperial: false,
+                maxWidth: 150
+            });
+            scaleControl.addTo(map);
+        }
+
+        // Add legend only once
+        if (!legendControl) {
+            legendControl = L.control({ position: 'bottomright' });
+            legendControl.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'legend');
+                div.innerHTML += '<i style="background:blue;opacity:0.7;width:18px;height:18px;display:inline-block;margin-right:6px;"></i> Hiking Routes<br>';
+                div.innerHTML += '<i style="background:grey;opacity:0.3;width:18px;height:18px;display:inline-block;margin-right:6px;"></i> Communities<br>';
+                div.innerHTML += '<i style="background:#CF2C28;opacity:0.8;width:18px;height:18px;display:inline-block;border-radius:50%;margin-right:6px;"></i> Attractions<br>';
+                div.innerHTML += '<i style="background:#FF6B6B;width:18px;height:18px;display:inline-block;border-radius:50%;margin-right:6px;"></i> Airport <br>';
+                div.innerHTML += '<i style="background:#4ECDC4;width:18px;height:18px;display:inline-block;border-radius:50%;margin-right:6px;"></i> Coach/Bus <br>';
+                div.innerHTML += '<i style="background:#FFE66D;width:18px;height:18px;display:inline-block;border-radius:50%;margin-right:6px;"></i> Train <br>';
+                div.innerHTML += '<hr style="margin:6px 0;">';
+                div.innerHTML += '<div style="font-size:13px;margin-bottom:6px;">Current base: <span id="baseLabel">OSM</span></div>';
+                div.innerHTML += '<button id="switchBaseBtn" style="display:block;padding:6px 8px;border:0;background:#CF2C28;color:#fff;border-radius:4px;cursor:pointer;">Switch to Topo</button>';
+                return div;
+            };
+            legendControl.addTo(map);
+
+            // 切換按鈕監聽（圖例 DOM 已存在）
+            var btn = document.getElementById('switchBaseBtn');
+            var lbl = document.getElementById('baseLabel');
+            if (btn && lbl) {
+                btn.addEventListener('click', function () {
+                    if (map.hasLayer(osm)) {
+                        map.removeLayer(osm);
+                        topo.addTo(map);
+                        lbl.textContent = 'Topo';
+                        btn.textContent = 'Switch to OSM';
+                    } else {
+                        map.removeLayer(topo);
+                        osm.addTo(map);
+                        lbl.textContent = 'OSM';
+                        btn.textContent = 'Switch to Topo';
+                    }
+                });
+            }
+        }
+
+
+        // after map is created and before fetching layers, add drawing support:
+        // Create a FeatureGroup to store drawn items and add to map
+        var drawnItems = L.featureGroup().addTo(map);
+
+        // Create draw control and add to map
+        var drawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+                marker: true,
+                polyline: true,
+                polygon: true,
+                rectangle: true,
+                circle: false, // disable circle if not needed
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+
+        // When a new shape is created, add it to drawnItems and open popup to edit props
+        map.on(L.Draw.Event.CREATED, function (e) {
+            var layer = e.layer;
+            // give a simple popup to allow adding a name
+            layer.bindPopup('<em>Drawn feature</em><br><button class="set-name">Set name</button>');
+            drawnItems.addLayer(layer);
+            layer.openPopup();
+        });
+
+        // Keep drawnItems consistent after edit/delete
+        map.on(L.Draw.Event.EDITED, function (e) {
+            // Edited layers are already in drawnItems; you can handle attributes here if needed
+            console.log('Edited layers:', e.layers.getLayers().length);
+        });
+        map.on(L.Draw.Event.DELETED, function (e) {
+            console.log('Deleted layers:', e.layers.getLayers().length);
+        });
+
+        // Optional: click handler inside popups (set name)
+        map.on('popupopen', function(e) {
+            var popupNode = e.popup._contentNode;
+            if (!popupNode) return;
+            var btn = popupNode.querySelector && popupNode.querySelector('.set-name');
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    var name = prompt('Enter feature name:');
+                    if (name !== null) {
+                        var layer = e.popup._source;
+                        layer.bindPopup('<strong>' + (name || '') + '</strong>');
+                        layer.closePopup();
+                    }
+                });
+            }
+        });
+
+        // Export to file
+        function exportDrawnGeoJSON() {
+            var geojson = drawnItems.toGeoJSON();
+            var str = JSON.stringify(geojson, null, 2);
+            var blob = new Blob([str], {type: "application/json;charset=utf-8"});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'drawn_features.geojson';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('exportBtn').addEventListener('click', exportDrawnGeoJSON);
+        document.getElementById('clearDrawnBtn').addEventListener('click', function(){
+            if (confirm('Clear all drawn features?')) {
+                drawnItems.clearLayers();
+            }
+        });
+
+        // Simple built-in search control (no extra plugin needed)
+        var searchControl = L.Control.extend({
+            options: {
+                position: 'bottomleft'
+            },
+            onAdd: function(map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                container.style.backgroundColor = 'white';
+                container.innerHTML = '<input type="text" id="searchBox" placeholder="Search..." style="padding:6px 8px;border:none;width:100px;border-radius:3px;font-size:13px;">';
+                return container;
+            }
+        });
+
+        map.addControl(new searchControl());
+
+        // Search functionality
+        document.getElementById('searchBox').addEventListener('input', function(e) {
+            var query = e.target.value.toLowerCase();
+            
+            if (attractionsLayer) {
+                attractionsLayer.eachLayer(function(layer) {
+                    var props = layer.feature.properties;
+                    var match = props.eng && props.eng.toLowerCase().includes(query);
+                    layer.setStyle ? layer.setStyle({opacity: match ? 1 : 0.3}) : null;
+                });
+            }
+
+            if (transportLayer) {
+                transportLayer.eachLayer(function(layer) {
+                    var props = layer.feature.properties;
+                    var match = props.name && props.name.toLowerCase().includes(query);
+                    layer.setOpacity ? layer.setOpacity(match ? 1 : 0.3) : null;
+                });
+            }
+        });
+    </script>
+</body>
+
+<div class="intro">
+    <p>
+        1. Hiking Routes<br>
+         &#8226;Val Gardena Hiking Routes:<br>
+        <a href="https://www.valgardena.it/en/summer-holidays-dolomites/trekking/hiking-trails/#cat=Long-Distance%20Hiking,Nature%20Trail,Hiking%20Trail,City%20Walk&filter=r-fullyTranslatedLangus-,r-openState-,sb-sortedBy-0&zc=12.,11.71177,46.55367" target="_blank">https://www.valgardena.it/en/trails/</a><br>
+
+        <br><br>
+
+        2. Bus Information<br>
+        Val Gardena Bus Information (downloadable timetables and routes):<br>
+        <a href="https://www.valgardena.it/en/bus-schedule/" target="_blank">https://www.valgardena.it/en/bus-schedule/</a><br>
+        South Tyrol Bus Route Search:<br>
+        <a href="https://www.suedtirolmobil.info/en/" target="_blank">https://www.suedtirolmobil.info/en/</a><br>
+        südtirolmobil App:<br>
+        <a href="https://www.suedtirolmobil.info/de/service-und-kontakt/app-suedtirolmobil" target="_blank">https://www.suedtirolmobil.info/de/service-und-kontakt/app-suedtirolmobil</a>
+
+        <br><br>
+
+        3. Cable Cars<br>
+        Cable Car Route Downloads:<br>
+        <a href="https://www.valgardena.it/en/summer-holidays-dolomites/mobility-val-gardena/gardena-card/" target="_blank">https://www.valgardena.it/en/summer-holidays-dolomites/mobility-val-gardena/gardena-card/</a><br>
+        Daily Lift Status – Gardena Card:<br>
+        <a href="https://www.gardenacard.com/en/" target="_blank">https://www.gardenacard.com/en/</a><br>
+        2025 Cable Car Opening Times:<br>
+        <a href="https://www.valgardena.it/en/summer-holidays-dolomites/lifts/" target="_blank">https://www.valgardena.it/en/summer-holidays-dolomites/lifts/</a><br>
+        Dolomiti Supersummer:<br>
+        <a href="https://www.dolomitisuperski.com/en/SuperSummer/home" target="_blank">https://www.dolomitisuperski.com/en/SuperSummer/home</a>
+
+        <br><br>
+
+        4. Weather & Webcams<br>
+        Val Gardena Mountain Webcams:<br>
+        <a href="https://www.valgardena.it/en/webcams/" target="_blank">https://www.valgardena.it/en/webcams/</a>
+
+        <br><br>
+
+        5. Route Planning<br>
+        Dolomites Route Planner (train, bus, cable car):<br>
+        <a href="https://www.suedtirolmobil.info/en/" target="_blank">https://www.suedtirolmobil.info/en/</a>
+
+        <br><br>
+
+        6. Main Official Websites<br>
+        Val Gardena Official Website:<br>
+        <a href="https://www.valgardena.it/en/" target="_blank">https://www.valgardena.it/en/</a><br>
+        Gardena Card Official Website:<br>
+        <a href="https://www.gardenacard.com/en/" target="_blank">https://www.gardenacard.com/en/</a>
+    </p>
+</div>
+
+
+
+
+
+</html>
